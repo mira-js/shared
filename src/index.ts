@@ -126,6 +126,19 @@ export type Result<T, E = Error> =
   | { ok: true; value: T }
   | { ok: false; error: E }
 
+// ─── Batch error ──────────────────────────────────────────────────────────────
+
+export class BatchError extends Error {
+  constructor(
+    message: string,
+    public readonly itemIndex: number,
+    public readonly item: CollectedItem,
+  ) {
+    super(message)
+    this.name = 'BatchError'
+  }
+}
+
 // ─── Collector interface ──────────────────────────────────────────────────────
 
 export interface CollectorOptions {
