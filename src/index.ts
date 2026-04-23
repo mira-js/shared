@@ -45,6 +45,10 @@ export type Category =
   | 'workflow-friction'
   | 'pricing'
   | 'switching-signal'
+  | 'integration-issue'
+  | 'comparison'
+  | 'workaround'
+  | 'information-seeking'
 
 export interface ExtractionResult {
   pain_points: string[]
