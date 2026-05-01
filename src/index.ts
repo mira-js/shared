@@ -37,8 +37,6 @@ export interface CollectedItem {
 
 // ─── LLM extraction result ────────────────────────────────────────────────────
 
-export type Sentiment = 'negative' | 'neutral' | 'positive'
-
 export type Category =
   | 'complaint'
   | 'feature-request'
@@ -52,7 +50,7 @@ export type Category =
 
 export interface ExtractionResult {
   pain_points: string[]
-  sentiment: Sentiment
+  sentiment: number  // -1.0 to 1.0
   category: Category
   mentioned_tools: string[]
   key_quote: string
