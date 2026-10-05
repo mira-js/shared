@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Structured JSON logger (ADR-021). Subpath-only (`@mira/shared-core/logger`):
 // the root entry stays free of Node-only deps (ADR-019).
 import pino from 'pino'

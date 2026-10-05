@@ -1,7 +1,7 @@
 # @mira/shared-core
 
 [![npm](https://img.shields.io/npm/v/@mira/shared-core)](https://www.npmjs.com/package/@mira/shared-core)
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://github.com/mira-js/mira-core/blob/main/LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](./LICENSE)
 
 Shared TypeScript types for the MIRA ecosystem. This is the contract between collectors, the analysis pipeline, and API consumers. If you are writing a custom collector or consuming the API in TypeScript, this is the only package you need.
 
@@ -202,3 +202,11 @@ export class LobstersCollector implements Collector {
 ## Part of mira-core
 
 This package is part of the [mira-core](https://github.com/mira-js/mira-core) monorepo — a self-hostable market intelligence engine.
+
+---
+
+## License
+
+AGPL-3.0-only — see [LICENSE](./LICENSE).
+
+Copyright (C) 2026 Fernando Nieto Pallares

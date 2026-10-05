@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Ambient per-run usage carrier (ADR-019). Holds the recorder on a declared
 // global so every module copy of this file shares one AsyncLocalStorage.
 import { AsyncLocalStorage } from 'node:async_hooks'
