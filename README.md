@@ -1,217 +1,126 @@
-# @mira/shared-core
+<div align="center">
 
-[![npm](https://img.shields.io/npm/v/@mira/shared-core)](https://www.npmjs.com/package/@mira/shared-core)
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](./LICENSE)
+# `@mira/shared-core`
 
-Shared TypeScript types for the MIRA ecosystem. This is the contract between collectors, the analysis pipeline, and API consumers. If you are writing a custom collector or consuming the API in TypeScript, this is the only package you need.
+**The contract every Mira package agrees on.**
 
----
+Types · `Result<T, E>` · JSON logger · usage recorder
+
+[![npm](https://img.shields.io/npm/v/@mira/shared-core?style=flat-square&color=818cf8&labelColor=0e1320)](https://www.npmjs.com/package/@mira/shared-core)
+[![license](https://img.shields.io/badge/license-AGPL--3.0-818cf8?style=flat-square&labelColor=0e1320)](./LICENSE)
+
+</div>
+
+<br>
+
+Mira collects discussion from Reddit, Hacker News and RSS, extracts pain points with an LLM and clusters them into themes. `shared-core` is the bottom layer — the shapes and helpers the other packages share. It depends on no other Mira package.
 
 ## Install
 
-```bash
+```sh
 npm install @mira/shared-core
-# or
-pnpm add @mira/shared-core
 ```
 
----
+## Three entry points
 
-## Exports
+| Import | Gives you |
+|:--|:--|
+| `@mira/shared-core` | Collected-item, extraction and research types · `Result<T, E>` · `BatchError` · the `Collector` contract |
+| `@mira/shared-core/logger` | Pino JSON lines · secret-key redaction · `debug`/`info` to stdout, `warn`/`error` to stderr |
+| `@mira/shared-core/usage-scope` | Per-run accounting of LLM tokens, embeddings and source calls |
 
-### Sources
+> [!NOTE]
+> The logger and usage recorder live on subpaths so the root entry stays free of Node-only dependencies.
+
+## Use
+
+**Fail as a value.**
 
 ```ts
-import { CoreSource } from '@mira/shared-core'
+import type { Result } from '@mira/shared-core'
 
-CoreSource.reddit      // 'reddit'
-CoreSource.hackernews  // 'hackernews'
-CoreSource.news        // 'news'
-
-// Community collectors can use any string slug — e.g. 'lobsters', 'capterra'
+function parse(raw: string): Result<number> {
+  const n = Number(raw)
+  return Number.isNaN(n) ? { ok: false, error: new Error('not a number') } : { ok: true, value: n }
+}
 ```
 
-### CollectedItem
-
-The normalized output every collector must return.
+**Log without leaking.**
 
 ```ts
-interface CollectedItem {
-  source: string        // source slug (use CoreSource values for built-in sources)
-  url: string           // canonical link to the original post/article
-  title: string
-  body: string          // post body or article text
-  author: string
-  timestamp: string     // ISO 8601
-  engagement: {
-    upvotes: number
-    comments: number
-  }
-  raw_replies: string[] // top-level reply texts (optional, can be empty)
-  subreddit?: string    // present on Reddit items
-  category?: string     // present on RSS/News items (feed title)
-}
+import { createLogger } from '@mira/shared-core/logger'
+
+const log = createLogger({ base: { service: 'my-worker' } })
+log.warn('upstream slow', { token: 'never printed', ms: 1800 })
 ```
 
-### Collector interface
+**Count what a run costs.**
 
 ```ts
-interface CollectorOptions {
-  query: string
-  limit?: number
-}
+import { createUsageRecorder, runWithUsageRecorder, recordLlmUsage } from '@mira/shared-core/usage-scope'
 
-interface Collector {
-  collect(options: CollectorOptions): Promise<CollectedItem[]>
-}
+const recorder = createUsageRecorder()
+await runWithUsageRecorder(recorder, async () => {
+  recordLlmUsage({ promptTokens: 1200, completionTokens: 300 })
+})
+recorder.snapshot()
 ```
 
-Any class or object satisfying `Collector` can be plugged into the pipeline.
+Every `record*` call is a no-op outside a scope, so library code can emit usage without knowing whether anyone is listening. Duplicate copies of the module in one process share a single recorder.
 
-### ResearchJob
+> [!IMPORTANT]
+> `Collector` is a type contract only. The open-core API runs its built-in sources and does not load custom collectors — use the contract in code that calls `collect` directly.
 
-Returned by the API on enqueue and status polling.
+## Where it sits
 
-```ts
-type JobStatus = 'queued' | 'active' | 'completed' | 'failed'
-type ResearchDepth = 'quick' | 'deep'
-
-interface ResearchJobInput {
-  query: string
-  sources?: string[]
-  depth?: ResearchDepth
-}
-
-interface ResearchJob extends ResearchJobInput {
-  jobId: string
-  status: JobStatus
-  progress?: number   // 0–100
-  createdAt: string
-  result?: ResearchResult
-}
+```mermaid
+flowchart LR
+  cli["cli"] -- HTTP --> api["api-core"]
+  cli -. types .-> shared["shared-core"]
+  api --> services["core-services"]
+  api --> collectors["core-collectors"]
+  services --> shared
+  collectors --> shared
+  classDef here fill:#818cf8,stroke:#a5b4fc,color:#0a0d1a
+  classDef pkg fill:#0e1320,stroke:#2a3250,color:#c7cbe0
+  class shared here
+  class cli,api,services,collectors pkg
 ```
 
-### ResearchResult
+<details>
+<summary><b>Configuration</b></summary>
 
-The fully analyzed output returned when a job completes.
+<br>
 
-```ts
-interface PainPointTheme {
-  theme: string
-  frequency: number
-  sources: string[]
-  sentiment: number    // -1.0 (very negative) to 1.0 (very positive)
-  evidence: Evidence[]
-}
+| Variable | Effect |
+|:--|:--|
+| `NODE_ENV=development` | Enables debug logs |
+| `MIRA_DEBUG_LOGGING=true` | Enables debug logs |
 
-interface Evidence {
-  source: string
-  url: string
-  excerpt: string
-}
+</details>
 
-interface ResearchResult {
-  query: string
-  summary: string
-  painPoints: PainPointTheme[]
-  competitorWeaknesses: PainPointTheme[]
-  emergingGaps: PainPointTheme[]
-  rawItems: CollectedItem[]
-}
+<details>
+<summary><b>Build from source</b></summary>
+
+<br>
+
+Clone next to the other open-core repositories in a pnpm workspace, then:
+
+```sh
+pnpm install && pnpm build
 ```
 
-### ExtractionResult
+</details>
 
-Per-item LLM output before theme aggregation.
+<br>
 
-```ts
-type Sentiment = 'negative' | 'neutral' | 'positive'
-
-type Category =
-  | 'complaint'
-  | 'feature-request'
-  | 'workflow-friction'
-  | 'pricing'
-  | 'switching-signal'
-
-interface ExtractionResult {
-  pain_points: string[]
-  sentiment: Sentiment
-  category: Category
-  mentioned_tools: string[]
-  key_quote: string
-}
-```
-
-### Result\<T, E\>
-
-Railway-oriented result type used throughout the codebase. Avoid `throw` in service functions — return `Result` instead.
-
-```ts
-type Result<T, E = Error> =
-  | { ok: true; value: T }
-  | { ok: false; error: E }
-
-// Usage
-function divide(a: number, b: number): Result<number> {
-  if (b === 0) return { ok: false, error: new Error('Division by zero') }
-  return { ok: true, value: a / b }
-}
-
-const r = divide(10, 2)
-if (r.ok) console.log(r.value)  // 5
-```
-
-### OpenViking types
-
-Used internally by the analysis pipeline. Exported for consumers building on top of the OpenViking context store.
-
-```ts
-interface OpenVikingResource { uri: string; content: string; metadata: OpenVikingResourceMetadata }
-interface OpenVikingFindOptions { scope: string; maxResults: number; layers: ('L0'|'L1'|'L2')[] }
-```
-
----
-
-## Writing a custom collector
-
-```ts
-import type { Collector, CollectorOptions, CollectedItem } from '@mira/shared-core'
-
-export class LobstersCollector implements Collector {
-  async collect({ query, limit = 25 }: CollectorOptions): Promise<CollectedItem[]> {
-    const url = `https://lobste.rs/search.json?q=${encodeURIComponent(query)}&what=stories&order=relevance`
-    const { results } = await fetch(url).then((r) => r.json())
-
-    return results.slice(0, limit).map((story: any) => ({
-      source: 'lobsters',
-      url: story.short_id_url,
-      title: story.title,
-      body: story.description ?? '',
-      author: story.submitter_user.username,
-      timestamp: story.created_at,
-      engagement: { upvotes: story.score, comments: story.comment_count },
-      raw_replies: [],
-    }))
-  }
-}
-```
-
----
-
-## Part of Mira's open core
-
-This package is part of Mira's open core. See [github.com/mira-js](https://github.com/mira-js) for the other packages.
-
----
-
-## Security
-
-For details on reporting security vulnerabilities, see [SECURITY.md](https://github.com/mira-js/.github/blob/main/SECURITY.md) in the mira-js org repository, or use [private vulnerability reporting](https://github.com/mira-js/shared/security/advisories/new) on this repository.
-
-## License
-
-AGPL-3.0-only — see [LICENSE](./LICENSE).
-Contributions require signing the [CLA](https://github.com/mira-js/.github/blob/main/CLA.md) — see [CONTRIBUTING.md](https://github.com/mira-js/.github/blob/main/CONTRIBUTING.md).
-
+<div align="center">
+<sub>
+Part of <a href="https://github.com/mira-js">Mira's open core</a> ·
+<a href="./LICENSE">AGPL-3.0-only</a> ·
+<a href="https://github.com/mira-js/.github/blob/main/CONTRIBUTING.md">Contributing</a> (<a href="https://github.com/mira-js/.github/blob/main/CLA.md">CLA</a>) ·
+<a href="https://github.com/mira-js/shared/security/advisories/new">Report a vulnerability</a>
+<br>
 Copyright (C) 2026 Fernando Nieto Pallares
+</sub>
+</div>
